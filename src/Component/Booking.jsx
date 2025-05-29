@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const VehicleBookingForm = () => {
   const [step, setStep] = useState(1);
@@ -20,32 +21,35 @@ const VehicleBookingForm = () => {
 
   useEffect(() => {
     if (wheels) {
-      const dummyData = wheels === 2
-        ? ['Cruiser', 'Sportbike', 'Scooter']
-        : ['SUV', 'Sedan', 'Hatchback'];
-      setVehicleTypes(dummyData);
+      const type = wheels === 2 ? 'Bike' : 'Car';
+      axios.get(`http://localhost:3001/vehicle?type=${type}`)
+        .then(res => {
+          const data = res.data;
+          const uniqueTypes = [...new Set(data.map(v => v.model.trim()))];
+          setVehicleTypes(uniqueTypes);
+        })
+        .catch(() => setMessage('Failed to fetch vehicle types'));
     }
   }, [wheels]);
 
   useEffect(() => {
     if (selectedType) {
-      const dummyModels = {
-        Cruiser: ['Royal Enfield', 'Harley Davidson'],
-        Sportbike: ['Yamaha R15', 'KTM RC 200'],
-        Scooter: ['Honda Activa', 'TVS Jupiter'],
-        SUV: ['Toyota Fortuner', 'Mahindra XUV700'],
-        Sedan: ['Honda City', 'Hyundai Verna'],
-        Hatchback: ['Maruti Swift', 'Hyundai i20']
-      };
-      setModels(dummyModels[selectedType] || []);
+      const type = wheels === 2 ? 'Bike' : 'Car';
+      axios.get(`http://localhost:3001/vehicle?type=${type}`)
+        .then(res => {
+          const filteredModels = res.data.filter(v => v.model.trim() === selectedType);
+          setModels(filteredModels.map(v => v.brand));
+        })
+        .catch(() => setMessage('Failed to fetch models'));
     }
-  }, [selectedType]);
+  }, [selectedType, wheels]);
 
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault();
+
     const payload = {
       full_name: `${firstName} ${lastName}`,
       type: wheels === 2 ? 'Bike' : 'Car',
@@ -54,8 +58,17 @@ const VehicleBookingForm = () => {
       start_date: startDate,
       end_date: endDate
     };
-    console.log('Booking Submitted:', payload);
-    setMessage('Booking successful!');
+
+    try {
+      const res = await axios.post('http://localhost:3001/booking', payload);
+      if (res.status === 200 || res.status === 201) {
+        setMessage('Booking successful!');
+      } else {
+        setMessage(`Booking failed: ${res.data?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      setMessage('Booking failed. Please try again.');
+    }
   };
 
   const renderStep = () => {
@@ -82,6 +95,7 @@ const VehicleBookingForm = () => {
             <button onClick={nextStep} disabled={!firstName || !lastName} style={buttonStyle}>Next</button>
           </div>
         );
+
       case 2:
         return (
           <div>
@@ -102,6 +116,7 @@ const VehicleBookingForm = () => {
             <button onClick={nextStep} disabled={!wheels} style={buttonStyle}>Next</button>
           </div>
         );
+
       case 3:
         return (
           <div>
@@ -122,6 +137,7 @@ const VehicleBookingForm = () => {
             <button onClick={nextStep} disabled={!selectedType} style={buttonStyle}>Next</button>
           </div>
         );
+
       case 4:
         return (
           <div>
@@ -142,6 +158,7 @@ const VehicleBookingForm = () => {
             <button onClick={nextStep} disabled={!selectedModel} style={buttonStyle}>Next</button>
           </div>
         );
+
       case 5:
         return (
           <div>
@@ -174,6 +191,7 @@ const VehicleBookingForm = () => {
             </button>
           </div>
         );
+
       default:
         return <h3>Done</h3>;
     }
